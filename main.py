@@ -14,33 +14,10 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 import glfw
 
+from graphics import *
+from math_utils import *
+
 grav_const = 4.30091*(10**(+1)) # Mpc (1E40)kg-1 (km/s)2
-
-def pc2km(x):
-    """Convers parsecs to kilometres."""
-    return x * 3.0857*(10**13)
-
-def pc2ly(x):
-    """Converts parsecs to light years."""
-    return x * 3.26156
-
-def pc2pm(x):
-    """Converts parsecs to petametres (1E15 metre)."""
-    return x * 3.0857
-
-def sm2_1E30(x):
-    """Converts solar mass to 1E30 kilograms"""
-    return x / 1.988
-
-def dist(obj1, obj2):
-    """Gets 3D distance between two objects."""
-    rel_pos = obj2.pos - obj1.pos
-    return np.linalg.norm(rel_pos)
-
-def get_direction_from_to(frm, to):
-    """Gets a unit vector in the direction from argument 1 to argument 2."""
-    rel_pos = to.pos - frm.pos
-    return rel_pos/dist(frm,to)
 
 class universe:
     def __init__(self,
@@ -108,16 +85,6 @@ class galaxy:
         # every Mpc is 3.0857*(10**19) km
         
         self.pos += (self.vel/(3.0857*(10**19))) * (dt * 3.1536*(10**12))
-
-def drawUniverse(uni):
-    for obj in uni.objs:
-        glColor(random.uniform(0.5,1), random.uniform(0.5,1), random.uniform(0.5,1))
-        glPushMatrix()
-        glTranslate(obj.pos[0], obj.pos[1], obj.pos[2])
-        glBegin(GL_POINTS)
-        glVertex3f(0,0,0)
-        glEnd()
-        glPopMatrix()
 
 def main():
     print("INITALIZING...")
@@ -241,10 +208,10 @@ def main():
             obj_c.update_pos(dt)
 
         # draw things on screen
-        if cycle % 1 == 0:
-            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-            drawUniverse(cosmos)
-            glfw.swap_buffers(window)
+        # if cycle % 1 == 0:
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+        drawUniverse(cosmos)
+        glfw.swap_buffers(window)
             
         time += dt
         cycle += 1
@@ -255,6 +222,6 @@ def main():
         else:
             dt = 10
 
-        print("\ndt:",dt)
+        print("\ndt (x100,000 years):",dt)
 
 main()
