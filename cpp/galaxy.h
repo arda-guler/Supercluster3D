@@ -27,6 +27,9 @@ public:
 	inline double dist(const cosmicvoid& c) {
 		return (pos - c.pos).mag();
 	}
+	inline double dist(const Vector3D& vec) {
+		return (pos - vec).mag();
+	}
 	Vector3D getGravityAccelBy(const galaxy& g);
 	Vector3D getDirectionTo(const galaxy& g);
 	Vector3D getVectorTo(const galaxy& g);

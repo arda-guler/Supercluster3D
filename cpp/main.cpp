@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <random>
+#include <ctime>
 
 #include <GLFW/glfw3.h>
 
@@ -21,7 +22,7 @@ std::vector<galaxy> genesis(int num_galaxy=500, int num_void=10, double uni_size
 	printf("Generating voids...\n");
 	for (int i = 0; i < num_void; i++) {
 		Vector3D n_pos = Vector3D(randd(-uni_size, uni_size), randd(-uni_size, uni_size), randd(0, uni_size*2));
-		double n_size = randd(-uni_size/0.7, uni_size/0.7);
+		double n_size = randd(0, uni_size/0.7);
 		cosmicvoid n_void = cosmicvoid(n_pos, n_size);
 		void_list.push_back(n_void);
 	}
@@ -48,6 +49,11 @@ std::vector<galaxy> genesis(int num_galaxy=500, int num_void=10, double uni_size
 }
 
 int main() {
+
+	// OPTIONS
+	double dt_base = 50; // million years per iteration
+	double dt = dt_base;
+	bool auto_dt = true;
 
 	printf("Initializing GLFW...\n");
 
@@ -76,38 +82,68 @@ int main() {
 	ratio = width / (float)height;
 	glViewport(0, 0, width, height);
 	glColor3d(1, 1, 1);
+	glEnable(GL_POINT_SMOOTH);
 
 	printf("Creating the universe...\n");
-	std::vector<galaxy> galaxies = genesis(1500, 50, 30, 0.02);
+	srand(time(NULL));
+	std::vector<galaxy> galaxies = genesis(500, 10, 30, 0.00005);
+	std::vector<Vector3D> accels;
 
-	printf("Starting...\n");
+	printf("Starting...\n\n");
 
 	while (!glfwWindowShouldClose(mw)) {
 		glfwPollEvents();
 
 		// physics
-		double dt = 0.1; // million years per iteration
+		
+		double high_accel = 0;
+		accels.clear();
 
-		for (auto &g : galaxies) {
+		printf("dt: %f\n", dt);
+
+		// calculate all accelerations first
+		for (int iter = 0; iter < galaxies.size();) {
 			Vector3D accel = Vector3D();
-			for (auto &g2 : galaxies) {
-				if (g != g2) {
-					accel += g.getGravityAccelBy(g2);
+			for (int iter2 = 0; iter2 < galaxies.size();) {
+				if (iter != iter2) { // don't apply gravity on a galaxy by itself
+									 // (I mean it is a thing, but simulated galaxies are rigid)
+
+					accel += galaxies[iter].getGravityAccelBy(galaxies[iter2]);
+					double accel_mag = galaxies[iter].getGravityAccelBy(galaxies[iter2]).mag();
+					if (high_accel == 0 && accel_mag > 5E-7) {
+						high_accel = accel_mag;
+					}
+					else if (high_accel > 0 && accel_mag > high_accel) {
+						high_accel = accel_mag;
+					}
 				}
+				iter2++;
 			}
-			g.updateStateVectors(accel, dt);
+			accels.push_back(accel);
+			// g.updateStateVectors(accel, dt); -- don't do this here
+			// since some galaxies will be updated before others, the motion
+			// calculations will not make sense especially at higher dts.
+			iter++;
+		}
+		
+		// apply the accelerations, now that all accelerations are
+		// calculated for the frame
+		for (int iter = 0; iter < galaxies.size();) {
+			galaxies[iter].updateStateVectors(accels[iter], dt);
+			iter++;
 		}
 
 		// drawing
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT);
 		
 		for (auto &g : galaxies) {
 			// very basic 3D projection for static camera
 			if (g.pos.z > -50) {
 
-				int psize = (int)(2 / ((g.pos.z+50) * (g.pos.z + 50)));
-				if (psize < 2)
-					psize = 2;
+				Vector3D cam_pos = Vector3D(0,0,-50);
+				double cam_dist = g.dist(cam_pos);
+				double psize = 2/( (cam_dist/50) * (cam_dist/50) );
+
 				glPointSize(psize);
 
 				glColor3d(g.pos.z/30, 0, (30-g.pos.z)/30);
@@ -115,6 +151,15 @@ int main() {
 				glBegin(GL_POINTS);
 				glVertex3d((g.pos.x / (g.pos.z + 50)) * (1/ratio), g.pos.y / (g.pos.z + 50), 0);
 				glEnd();
+			}
+		}
+
+		if(auto_dt){
+			if (high_accel) {
+				dt = dt_base / (high_accel / 5E-8);
+			}
+			else {
+				dt = dt_base;
 			}
 		}
 		
