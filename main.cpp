@@ -7,9 +7,11 @@
 
 #include <GLFW/glfw3.h>
 
+#include "constants.h"
 #include "galaxy.h"
 #include "Vector3D.h"
 #include "cosmicvoid.h"
+#include "universe.h"
 
 double randd(double min=0, double max=1) {
 	return min + (double)(rand()) / ((double)(RAND_MAX / (max - min)));
@@ -86,7 +88,8 @@ int main() {
 
 	printf("Creating the universe...\n");
 	srand(time(NULL));
-	std::vector<galaxy> galaxies = genesis(500, 10, 30, 0.00005);
+	universe cosmos = universe();
+	std::vector<galaxy> galaxies = genesis(50, 10, 30, 0.00005);
 	std::vector<Vector3D> accels;
 
 	printf("Starting...\n\n");
@@ -131,6 +134,13 @@ int main() {
 		for (int iter = 0; iter < galaxies.size();) {
 			galaxies[iter].updateStateVectors(accels[iter], dt);
 			iter++;
+		}
+
+		// apply expansion to universe with a cosmological model that makes a bit too much sense
+		cosmos *= 1+(modified_cosmological_constant * dt);
+
+		for (auto &g : galaxies) {
+			g.pos *= 1+(modified_cosmological_constant * dt);
 		}
 
 		// drawing
