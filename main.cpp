@@ -4,6 +4,7 @@
 #include <vector>
 #include <random>
 #include <ctime>
+#include <conio.h>
 
 #include <GLFW/glfw3.h>
 
@@ -12,9 +13,32 @@
 #include "Vector3D.h"
 #include "cosmicvoid.h"
 #include "universe.h"
+#include "camera.h"
+#include "Matrix3x3.h"
 
 double randd(double min=0, double max=1) {
 	return min + (double)(rand()) / ((double)(RAND_MAX / (max - min)));
+}
+
+Vector3D world2cam(camera cam, Vector3D obj_pos) {
+	Vector3D rel_pos = obj_pos - cam.pos;
+	Vector3D cam_x = cam.orient.v1();
+	Vector3D cam_y = cam.orient.v2();
+	Vector3D cam_z = cam.orient.v3();
+
+	double z_dist = rel_pos.dot(cam_z);
+
+	if (z_dist <= 0) {
+		return Vector3D(0,0,-1);
+	}
+
+	double x_dist = rel_pos.dot(cam_x);
+	double y_dist = rel_pos.dot(cam_y);
+
+	double x_skew = -(x_dist / z_dist);
+	double y_skew = -(y_dist / z_dist);
+
+	return Vector3D(x_skew, y_skew, 0);
 }
 
 std::vector<galaxy> genesis(int num_galaxy=500, int num_void=10, double uni_size=30, double max_vel=0.1) {
@@ -53,7 +77,7 @@ std::vector<galaxy> genesis(int num_galaxy=500, int num_void=10, double uni_size
 int main() {
 
 	// OPTIONS
-	double dt_base = 50; // million years per iteration
+	double dt_base = 500; // million years per iteration
 	double dt = dt_base;
 	bool auto_dt = true;
 
@@ -89,8 +113,12 @@ int main() {
 	printf("Creating the universe...\n");
 	srand(time(NULL));
 	universe cosmos = universe();
-	std::vector<galaxy> galaxies = genesis(50, 10, 30, 0.00005);
+	std::vector<galaxy> galaxies = genesis(100, 0, 30, 0);
 	std::vector<Vector3D> accels;
+
+	camera main_cam = camera(Vector3D(0, 0, -50));
+	double cam_lin_speed = 0.5;
+	double cam_rot_speed = 0.01;
 
 	printf("Starting...\n\n");
 
@@ -103,6 +131,58 @@ int main() {
 		accels.clear();
 
 		printf("dt: %f\n", dt);
+
+		// get user input
+		if (_kbhit()) {
+			int keycode = _getch();
+			
+			switch (keycode)
+			{
+			// linear movement
+			case 119: // W
+				main_cam.move_local(Vector3D(0, 0, 1) * cam_lin_speed);
+				break;
+			case 97: // A
+				main_cam.move_local(Vector3D(1, 0, 0) * cam_lin_speed);
+				break;
+			case 115: // S
+				main_cam.move_local(Vector3D(0, 0, -1) * cam_lin_speed);
+				break;
+			case 100: // D
+				main_cam.move_local(Vector3D(-1, 0, 0) * cam_lin_speed);
+				break;
+			case 114: // R
+				main_cam.move_local(Vector3D(0, -1, 0) * cam_lin_speed);
+				break;
+			case 102: // F
+				main_cam.move_local(Vector3D(0, 1, 0) * cam_lin_speed);
+				break;
+
+			// rotation
+			case 117: // U
+				main_cam.rotate(main_cam.orient.v3(), cam_rot_speed);
+				break;
+			case 111: // O
+				main_cam.rotate(main_cam.orient.v3(), -cam_rot_speed);
+				break;
+			case 141: // I
+				main_cam.rotate(main_cam.orient.v1(), cam_rot_speed);
+				break;
+			case 107: // K
+				main_cam.rotate(main_cam.orient.v1(), -cam_rot_speed);
+				break;
+			case 106: // J
+				main_cam.rotate(main_cam.orient.v2(), cam_rot_speed);
+				break;
+			case 108: // L
+				main_cam.rotate(main_cam.orient.v2(), -cam_rot_speed);
+				break;
+
+			default:
+				__noop;
+				break;
+			}
+		}
 
 		// calculate all accelerations first
 		for (int iter = 0; iter < galaxies.size();) {
@@ -148,21 +228,25 @@ int main() {
 		
 		for (auto &g : galaxies) {
 			// very basic 3D projection for static camera
-			if (g.pos.z > -50) {
 
-				Vector3D cam_pos = Vector3D(0,0,-50);
-				double cam_dist = g.dist(cam_pos);
-				double psize = 2/( (cam_dist/50) * (cam_dist/50) );
+			double cam_dist = main_cam.dist(g);
+			double psize = 2/( (cam_dist/50) * (cam_dist/50) );
+			Vector3D galaxy_screen_pos = world2cam(main_cam, g.pos);
 
+			if (galaxy_screen_pos.z != -1){
 				glPointSize(psize);
 
-				glColor3d(g.pos.z/30, 0, (30-g.pos.z)/30);
+				//glColor3d(g.pos.z/30, 0, (30-g.pos.z)/30);
+				glColor3d(1, 1, 1);
 
 				glBegin(GL_POINTS);
-				glVertex3d((g.pos.x / (g.pos.z + 50)) * (1/ratio), g.pos.y / (g.pos.z + 50), 0);
+				//glVertex3d((g.pos.x / (g.pos.z + 50)) * (1/ratio), g.pos.y / (g.pos.z + 50), 0);
+				glVertex3d(galaxy_screen_pos.x, galaxy_screen_pos.y, galaxy_screen_pos.z);
 				glEnd();
 			}
 		}
+
+		//main_cam.rotate(Vector3D(1, 0, 0), 0.1);
 
 		if(auto_dt){
 			if (high_accel) {
